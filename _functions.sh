@@ -201,6 +201,7 @@ function _migrate_branches()
 function _discover_submodules()
 {
   unset IGNORE_DIRS SUBMODULES ACTIONS SELECTION SUBDIRS choices options MENU FLAGS
+  FLAGS+="--no-minimize-url"
   _get_svn_layout
   clear
   echo "Discovering potential submodule candidates..."
@@ -292,6 +293,7 @@ function _create_gitignore()
 function _get_svn_layout()
 {
   unset FLAGS
+  FLAGS+="--no-minimize-url"
   echo "Analyzing repository layout..."
   TAGS=$(svn ls ${REPO_URL} ${SVN_OPTIONS}|grep '^tags/$'|awk -F'/' {'print $(NF-1)'})
   BRANCHES=$(svn ls ${REPO_URL} ${SVN_OPTIONS}|grep '^branches/$'|awk -F'/' {'print $(NF-1)'})
