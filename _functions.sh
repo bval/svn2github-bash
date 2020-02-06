@@ -356,6 +356,7 @@ function _clean_cutover()
   _migrate_trunk
   _migrate_branches
   _migrate_tags
+  cd ..
 }
 
 ## Migrate our repository with history
@@ -440,6 +441,7 @@ function _git_svn_clone()
     PUT 10 12
     echo -e ""
     NORM
+    cd ..
   )
 }
 
