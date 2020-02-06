@@ -152,21 +152,21 @@ function _prepare_github()
   echo "Creating ${REPO_NAME} in GitHub..."
   curl -skH "Authorization: token ${GITHUB_TOKEN}" \
     ${GITHUB_URL}/api/v3/orgs/${GITHUB_ORG}/repos \
-    -d '{"name":"'"${REPO_NAME}"'"}' &>> ${LOG_FILE}
+    -d '{"name":"'"${REPO_NAME}"'"}' >> ${LOG_FILE} 2>&1
 }
 
 ## Migrate trunk to master
 function _migrate_trunk()
 {
   echo "Migrating Trunk to Master..."
-  git remote add github ${GITHUB_URL}/${GITHUB_ORG}/${REPO_NAME}.git &>> ${LOG_FILE}
+  git remote add github ${GITHUB_URL}/${GITHUB_ORG}/${REPO_NAME}.git >> ${LOG_FILE} 2>&1
   if [[ $(git branch -a|grep 'remotes/svn/trunk') ]]
   then
-    echo "git checkout -b master remotes/svn/trunk" &>> ${LOG_FILE}
+    echo "git checkout -b master remotes/svn/trunk" >> ${LOG_FILE} 2>&1
     git checkout -B master remotes/svn/trunk
-    git push --set-upstream github master &>> ${LOG_FILE}
+    git push --set-upstream github master >> ${LOG_FILE} 2>&1
   else
-    git push github --mirror &>> ${LOG_FILE}
+    git push github --mirror >> ${LOG_FILE} 2>&1
   fi
 }
 
@@ -176,9 +176,9 @@ function _migrate_tags()
   echo "Migrating Tags..."
   git for-each-ref refs/remotes/svn/tags|cut -d / -f5-|while read ref
   do
-    git tag -a "${ref}" -m"SVN to GitHub Migration" "refs/remotes/svn/tags/${ref}" &>> ${LOG_FILE}
-    git push github ":refs/heads/tags/${ref}" &>> ${LOG_FILE}
-    git push github tag "${ref}" &>> ${LOG_FILE}
+    git tag -a "${ref}" -m"SVN to GitHub Migration" "refs/remotes/svn/tags/${ref}" >> ${LOG_FILE} 2>&1
+    git push github ":refs/heads/tags/${ref}" >> ${LOG_FILE} 2>&1
+    git push github tag "${ref}" >> ${LOG_FILE} 2>&1
   done
 }
 
@@ -189,10 +189,10 @@ function _migrate_branches()
   for branch in $(git branch -a|grep svn|grep -v '/tags/'|grep -v 'remotes/svn/trunk')
   do
       github_branch=$(echo ${branch}|awk -F'/' {'print $NF'})
-      echo "git checkout -b ${github_branch} ${branch}" &>> ${LOG_FILE}
-      git checkout -B ${github_branch} ${branch} &>> ${LOG_FILE}
-      _initialize_lfs &>> ${LOG_FILE}
-      git push --set-upstream github ${github_branch} &>> ${LOG_FILE}
+      echo "git checkout -b ${github_branch} ${branch}" >> ${LOG_FILE} 2>&1
+      git checkout -B ${github_branch} ${branch} >> ${LOG_FILE} 2>&1
+      _initialize_lfs >> ${LOG_FILE} 2>&1
+      git push --set-upstream github ${github_branch} >> ${LOG_FILE} 2>&1
   done
 }
 
@@ -386,7 +386,7 @@ function _git_svn_clone()
       RETRY_COUNT=0
       showBar ${CURRENT_REV} ${REV_COUNT}
       echo -e "" && echo -e "     REV: ${REV}"
-      git svn fetch -qr${REV} ${AUTHORS} &>> ${LOG_FILE} > /dev/null
+      git svn fetch -qr${REV} ${AUTHORS} >> ${LOG_FILE} 2>&1 > /dev/null
       RESULT=$?
       while [[ ${RESULT} -ne 0 ]]
       do
@@ -426,12 +426,12 @@ function _git_svn_clone()
         done
         if [[ "${RETRY,,}" == "no" ]]
         then
-          git svn reset ${OLD_REV} &>> ${LOG_FILE} > /dev/null
+          git svn reset ${OLD_REV} >> ${LOG_FILE} 2>&1 > /dev/null
           RESULT=$?
         else
           showBar ${CURRENT_REV} ${REV_COUNT}
           echo -e "" && echo -e "     REV: ${REV}"
-          git svn fetch -qr${REV} ${AUTHORS} &>> ${LOG_FILE} > /dev/null
+          git svn fetch -qr${REV} ${AUTHORS} >> ${LOG_FILE} 2>&1 > /dev/null
           RESULT=$?
         fi
         ((RETRY++))
@@ -479,14 +479,14 @@ function _add_git_submodules()
    do
      GITHUB_REMOTE=$(echo ${SUBMODULE}|awk -F',' {'print $2'})
      LOCAL_PATH=$(echo ${SUBMODULE}|awk -F',' {'print $1'})
-     rm -fr ${LOCAL_PATH} &>> ${LOG_FILE}
+     rm -fr ${LOCAL_PATH} >> ${LOG_FILE} 2>&1
      git add -u
-     git submodule add ${GITHUB_REMOTE} ${LOCAL_PATH} &>> ${LOG_FILE}
+     git submodule add ${GITHUB_REMOTE} ${LOCAL_PATH} >> ${LOG_FILE} 2>&1
      #git submodule init
      git add .gitmodules ${LOCAL_PATH} && git add -u
-     git commit -m"Added git submodule ${SUBMODULE}" &>> ${LOG_FILE}
+     git commit -m"Added git submodule ${SUBMODULE}" >> ${LOG_FILE} 2>&1
    done
-   git push &>> ${LOG_FILE}
+   git push >> ${LOG_FILE} 2>&1
   )
 }
 
