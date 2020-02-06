@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 ## Include files in the current working directory
+[ -z "$DEBUG" ] || set -xT
+
 if [[ $(uname) != 'Linux' ]]
 then
   source _functions.sh
