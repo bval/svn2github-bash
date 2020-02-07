@@ -210,14 +210,16 @@ function _discover_submodules()
   # it turns out, some folks have .git in their repos, and this falsely
   # identifies those as submodules. Let's remove those entries and not
   # present the user with the option to migrate them
-  sed -i '/\.git/d' /tmp/submodules.txt
+  sed -e '/\.git/d' /tmp/submodules.txt > /tmp/submodules.tmp
+  mv /tmp/submodules.tmp /tmp/submodules.txt
   # Remove empty "trunk", "tags" and "branches" from the list of potentials
   for DIR in $(cat /tmp/submodules.txt);
   do
     FILES=$(svn list ${REPO_URL}/${DIR} ${SVN_OPTIONS})
     if [[ ${#FILES} -le 1 ]]
     then
-      sed -i "/${DIR}/d" /tmp/submodules.txt
+      sed -e "/${DIR}/d" /tmp/submodules.txt > /tmp/submodules.tmp
+      mv /tmp/submodules.tmp /tmp/submodules.txt
     fi
   done
   # Get the path to the submodules
