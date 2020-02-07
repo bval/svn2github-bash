@@ -149,10 +149,16 @@ function _welcome()
 ## Create a repository in GitHub
 function _prepare_github()
 {
+  if [[ ${GITHUB_URL} == *"github.com"* ]]
+  then
+    API_URL=https://api.github.com/orgs/${GITHUB_ORG}/repos
+  else
+    API_URL=${GITHUB_URL}/api/v3/orgs/${GITHUB_ORG}/repos
+  fi
   echo "Creating ${REPO_NAME} in GitHub..."
   curl -skH "Authorization: token ${GITHUB_TOKEN}" \
-    ${GITHUB_URL}/api/v3/orgs/${GITHUB_ORG}/repos \
-    -d '{"name":"'"${REPO_NAME}"'"}' >> ${LOG_FILE} 2>&1
+    ${API_URL} \
+    -d '{"name":"'"${REPO_NAME}"'", "private":"true"}' >> ${LOG_FILE} 2>&1
 }
 
 ## Migrate trunk to master
