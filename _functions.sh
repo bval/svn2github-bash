@@ -414,7 +414,7 @@ function _git_svn_clone()
         echo "Error: ${ERROR_MSG}"
         echo ""
         read -p "Would you like to attempt revision ${REV} again? (yes/no) " RETRY
-        while [[ "${RETRY,,}" != "yes" ]] && [[ "${RETRY,,}" != "no" ]]
+        while [[ "${RETRY,,}" == "yes" ]] && [[ "${RETRY,,}" != "no" ]]
         do
           echo 'Please type "yes" or "no"'
           read -p "Would you like to attempt revision ${REV} again? (yes/no) " RETRY
