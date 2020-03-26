@@ -1,40 +1,49 @@
+#!/bin/bash
+# shellcheck disable=SC1083,SC2030,SC2031
+
+################################################################################
+############################## Functions.sh ####################################
+################################################################################
 function _setup()
 {
   # This is for Windows Git-Bash, so we can include `bc.exe`
-  export PATH=${PATH}:$(pwd)
+  PATH=${PATH}:$(pwd)
+  export PATH="$PATH"
   ## Git-SVN has issues on Mac... don't try it. Just use Docker or a VM
   if [[ $(uname) != 'Linux' ]]
   then
+    # shellcheck disable=SC1091
     source settings.ini
   else
     INC_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)"
-    [[ -f ${INC_DIR}/settings.ini ]] && source ${INC_DIR}/settings.ini
+    # shellcheck disable=SC1090
+    [[ -f "${INC_DIR}/settings.ini" ]] && source "${INC_DIR}/settings.ini"
   fi
   ## If we have a settings file, use it to bypass input
   rm -f /tmp/{submodules,github_remotes}.txt
   ## If there's no settings file, ask for input
   ## This can be stored your the environment as well
-  while [ -z ${REPOSITORY} ];do
-    [[ -z ${REPOSITORY} ]] && read -p "Please specify an SVN Repository: " REPOSITORY
+  while [ -z "${REPOSITORY}" ];do
+    [[ -z "${REPOSITORY}" ]] && read -r -p "Please specify an SVN Repository: " REPOSITORY
     export REPOSITORY # exporting so it's callable outside of this function
   done
-  while [ -z ${GITHUB_URL} ];do
-    [[ -z ${GITHUB_URL} ]] && read -p "Please specify a URL for GitHub (i.e. https://github.mycompany.com): " GITHUB_URL
+  while [ -z "${GITHUB_URL}" ];do
+    [[ -z "${GITHUB_URL}" ]] && read -r -p "Please specify a URL for GitHub (i.e. https://github.mycompany.com): " GITHUB_URL
     export GITHUB_URL # exporting so it's callable outside of this function
   done
-  while [ -z ${GITHUB_ORG} ];do
-    [[ -z ${GITHUB_ORG} ]] && read -p "Please specify an Organization to place these repositories in: " GITHUB_ORG
+  while [ -z "${GITHUB_ORG}" ];do
+    [[ -z "${GITHUB_ORG}" ]] && read -r -p "Please specify an Organization to place these repositories in: " GITHUB_ORG
     export GITHUB_ORG # exporting so it's callable outside of this function
   done
-  while [ -z ${GITHUB_TOKEN} ];do
-    [[ -z ${GITHUB_TOKEN} ]] && echo -n "Please provide a Personal Access Token that can create repositories in ${GITHUB_ORG}: ";read -s GITHUB_TOKEN
+  while [ -z "${GITHUB_TOKEN}" ];do
+    [[ -z "${GITHUB_TOKEN}" ]] && echo -n "Please provide a Personal Access Token that can create repositories in ${GITHUB_ORG}: ";read -r -s GITHUB_TOKEN
     export GITHUB_TOKEN # exporting so it's callable outside of this function
     echo ""
   done
-  [[ -z ${MAX_FILE_SIZE} ]] && MAX_FILE_SIZE=100
-  if [[ ! -z ${AUTHORS_FILE} ]]
+  [[ -z "${MAX_FILE_SIZE}" ]] && MAX_FILE_SIZE=100
+  if [[ -n "${AUTHORS_FILE}" ]]
   then
-    if [[ ! -f ${AUTHORS_FILE} ]]
+    if [[ ! -f "${AUTHORS_FILE}" ]]
     then
       echo "${AUTHORS_FILE} does not exist, but the AUTHORS_FILE variable is set"
       echo "Please ensure this file is created and contains a complete list of"
@@ -44,32 +53,32 @@ function _setup()
       AUTHORS=" --authors-file=${AUTHORS_FILE}"
     fi
   fi
-  github_machine=$(echo ${GITHUB_URL}|awk -F'/' {'print $3'})
-  svn_machine=$(echo ${REPOSITORY}|awk -F'/' {'print $3'}|awk -F':' {'print $1'})
+  GITHUB_MACHINE=$(echo "${GITHUB_URL}" | awk -F'/' '{print $3}')
+  SVN_MACHINE=$(echo "${REPOSITORY}" | awk -F'/' '{print $3}' | awk -F':' '{print $1}')
   cat > ~/.netrc <<EOF
-machine ${github_machine}
+machine ${GITHUB_MACHINE}
 login token
 password ${GITHUB_TOKEN}
 
-machine ${svn_machine}
+machine ${SVN_MACHINE}
 login ${SVN_USERNAME}
 password ${SVN_PASSWORD}
 EOF
   ## Set our default SVN options
   SVN_OPTIONS="--trust-server-cert --non-interactive --username ${SVN_USERNAME} --password ${SVN_PASSWORD}"
   ## Get the repo name and full URL for the remote subversion repository
-  REPO_NAME=$(svn info ${REPOSITORY} ${SVN_OPTIONS}|grep '^Path'|awk {'print $2'}|sed 's/ /-/g')
-  REPO_URL=$(svn info ${REPOSITORY} ${SVN_OPTIONS}|grep '^URL'|awk {'print $2'})
-  SVN_HEAD=$(svn info ${REPOSITORY} ${SVN_OPTIONS}|grep '^Revision'|awk {'print $2'})
+  REPO_NAME=$(svn info "${REPOSITORY}" "${SVN_OPTIONS}"|grep '^Path'|awk '{print $2}'|sed 's/ /-/g')
+  REPO_URL=$(svn info "${REPOSITORY}" "${SVN_OPTIONS}"|grep '^URL'|awk '{print $2}')
+  #SVN_HEAD=$(svn info "${REPOSITORY}" "${SVN_OPTIONS}"|grep '^Revision'|awk '{print $2}')
   ## Set the log file, if we don't have an explicit file configured
-  [[ -z ${LOG_FILE} ]] && LOG_FILE=/tmp/svn2github-${REPO_NAME}.log
+  [[ -z "${LOG_FILE}" ]] && LOG_FILE="/tmp/svn2github-${REPO_NAME}.log"
 }
 
 ## Get some info about the remote repository
 function _svn_sizer()
 {
   _print_banner "Discovering repository size"
-  svn list ${SVN_OPTIONS} -vR ${REPO_URL}|grep -v '/$'|awk '
+  svn list "${SVN_OPTIONS}" -vR "${REPO_URL}"|grep -v '/$'|awk '
   {
     sum+=$3
     if (($3 + 1048575)/1048576 > '$MAX_FILE_SIZE')
@@ -79,9 +88,9 @@ function _svn_sizer()
     i++
   } END {
     print "\nTotal Size: " (sum + 1048575)/1048576" MiB" "\nNumber of Files: " i/1000 " K"
-  }' > /tmp/${REPO_NAME}-size.txt
-  tail -n3 /tmp/${REPO_NAME}-size.txt
-  if [[ "$(head -n1 /tmp/${REPO_NAME}-size.txt|awk {'print $2'})" = "MiB" ]]
+  }' > "/tmp/${REPO_NAME}-size.txt"
+  tail -n3 "/tmp/${REPO_NAME}-size.txt"
+  if [[ "$(head -n1 "/tmp/${REPO_NAME}-size.txt"|awk {'print $2'})" = "MiB" ]]
   then
     _print_banner "The following files have been discovered to exceed" \
     "the maximum allowable filesize of the repository," \
@@ -93,7 +102,7 @@ function _svn_sizer()
     " For a complete list of files, refer to:" \
     "/tmp/${REPO_NAME}-size.txt"
     echo ""
-    head -n -3 /tmp/${REPO_NAME}-size.txt
+    head -n -3 "/tmp/${REPO_NAME}-size.txt"
     exit 1
   else
     sleep 5
@@ -103,8 +112,8 @@ function _svn_sizer()
 # Convert bytes to human readable
 function _humanize_bytes()
 {
-  local -i bytes=$1;
-  if [[ ${bytes} -lt 1048576 ]]; then
+  local -i bytes="$1";
+  if [[ "${bytes}" -lt 1048576 ]]; then
     echo "$(( (bytes + 1023)/1024 )) KiB"
   else
     echo "$(( (bytes + 1048575)/1048576 )) MiB"
@@ -140,7 +149,7 @@ function _welcome()
     "layouts. This tools comes with no warranty," \
     "expressed or implied, and may be modified" \
     "by anyone who sees fit to do so, in any way" \
-    "they see fit, with no reprocussions whatsoever"
+    "they see fit, with no repercussions whatsoever"
     echo ""
     read -n 1 -s -r -p "Press any key to continue..."
     echo ""
@@ -149,30 +158,25 @@ function _welcome()
 ## Create a repository in GitHub
 function _prepare_github()
 {
-  if [[ ${GITHUB_URL} == *"github.com"* ]]
-  then
-    API_URL=https://api.github.com/orgs/${GITHUB_ORG}/repos
-  else
-    API_URL=${GITHUB_URL}/api/v3/orgs/${GITHUB_ORG}/repos
-  fi
   echo "Creating ${REPO_NAME} in GitHub..."
   curl -skH "Authorization: token ${GITHUB_TOKEN}" \
-    ${API_URL} \
-    -d '{"name":"'"${REPO_NAME}"'", "private":"true"}' >> ${LOG_FILE} 2>&1
+    "${GITHUB_URL}/api/v3/orgs/${GITHUB_ORG}/repos" \
+    -d '{"name":"'"${REPO_NAME}"'"}' &>> "${LOG_FILE}"
 }
 
 ## Migrate trunk to master
 function _migrate_trunk()
 {
   echo "Migrating Trunk to Master..."
-  git remote add github ${GITHUB_URL}/${GITHUB_ORG}/${REPO_NAME}.git >> ${LOG_FILE} 2>&1
+  git remote add github "${GITHUB_URL}/${GITHUB_ORG}/${REPO_NAME}.git" &>> "${LOG_FILE}"
+  # shellcheck disable=SC2143
   if [[ $(git branch -a|grep 'remotes/svn/trunk') ]]
   then
-    echo "git checkout -b master remotes/svn/trunk" >> ${LOG_FILE} 2>&1
+    echo "git checkout -b master remotes/svn/trunk" &>> "${LOG_FILE}"
     git checkout -B master remotes/svn/trunk
-    git push --set-upstream github master >> ${LOG_FILE} 2>&1
+    git push --set-upstream github master &>> "${LOG_FILE}"
   else
-    git push github --mirror >> ${LOG_FILE} 2>&1
+    git push github --mirror &>> "${LOG_FILE}"
   fi
 }
 
@@ -180,11 +184,12 @@ function _migrate_trunk()
 function _migrate_tags()
 {
   echo "Migrating Tags..."
-  git for-each-ref refs/remotes/svn/tags|cut -d / -f5-|while read ref
+  git for-each-ref refs/remotes/svn/tags|cut -d / -f5-|while read -r ref
   do
-    git tag -a "${ref}" -m"SVN to GitHub Migration" "refs/remotes/svn/tags/${ref}" >> ${LOG_FILE} 2>&1
-    git push github ":refs/heads/tags/${ref}" >> ${LOG_FILE} 2>&1
-    git push github tag "${ref}" >> ${LOG_FILE} 2>&1
+    # shellcheck disable=SC2129
+    git tag -a "${ref}" -m"SVN to GitHub Migration" "refs/remotes/svn/tags/${ref}" &>> "${LOG_FILE}"
+    git push github ":refs/heads/tags/${ref}" &>> "${LOG_FILE}"
+    git push github tag "${ref}" &>> "${LOG_FILE}"
   done
 }
 
@@ -194,11 +199,13 @@ function _migrate_branches()
   echo "Migrating Branches..."
   for branch in $(git branch -a|grep svn|grep -v '/tags/'|grep -v 'remotes/svn/trunk')
   do
-      github_branch=$(echo ${branch}|awk -F'/' {'print $NF'})
-      echo "git checkout -b ${github_branch} ${branch}" >> ${LOG_FILE} 2>&1
-      git checkout -B ${github_branch} ${branch} >> ${LOG_FILE} 2>&1
-      _initialize_lfs >> ${LOG_FILE} 2>&1
-      git push --set-upstream github ${github_branch} >> ${LOG_FILE} 2>&1
+    # shellcheck disable=SC2129
+    github_branch=$(echo "${branch}"|awk -F'/' {'print $NF'})
+    # shellcheck disable=SC2129
+    echo "git checkout -b ${github_branch} ${branch}" &>> "${LOG_FILE}"
+    git checkout -B "${github_branch}" "${branch}" &>> "${LOG_FILE}"
+    _initialize_lfs &>> "${LOG_FILE}"
+    git push --set-upstream github "${github_branch}" &>> "${LOG_FILE}"
   done
 }
 
@@ -207,46 +214,48 @@ function _migrate_branches()
 function _discover_submodules()
 {
   unset IGNORE_DIRS SUBMODULES ACTIONS SELECTION SUBDIRS choices options MENU FLAGS
-  FLAGS+="--no-minimize-url"
   _get_svn_layout
   clear
   echo "Discovering potential submodule candidates..."
   # Get the potential list of submodules, with branches, tags and trunk
-  svn -R list ${REPO_URL} ${SVN_OPTIONS}|grep -E '(/trunk/$|/branches/$|/tags/$)' > /tmp/submodules.txt
+  svn -R list "${REPO_URL}" "${SVN_OPTIONS}"|grep -E '(/trunk/$|/branches/$|/tags/$)' > /tmp/submodules.txt
   # it turns out, some folks have .git in their repos, and this falsely
   # identifies those as submodules. Let's remove those entries and not
   # present the user with the option to migrate them
-  sed -e '/\.git/d' /tmp/submodules.txt > /tmp/submodules.tmp
-  mv /tmp/submodules.tmp /tmp/submodules.txt
+  sed -i 's/\/.git\//d' /tmp/submodules.txt
   # Remove empty "trunk", "tags" and "branches" from the list of potentials
+  # shellcheck disable=SC2013
   for DIR in $(cat /tmp/submodules.txt);
   do
-    FILES=$(svn list ${REPO_URL}/${DIR} ${SVN_OPTIONS})
+    FILES=$(svn list "${REPO_URL}/${DIR}" "${SVN_OPTIONS}")
     if [[ ${#FILES} -le 1 ]]
     then
-      sed -e "/${DIR}/d" /tmp/submodules.txt > /tmp/submodules.tmp
-      mv /tmp/submodules.tmp /tmp/submodules.txt
+      sed -i "s/${DIR}/d" /tmp/submodules.txt
     fi
   done
   # Get the path to the submodules
-  export SUBMODULES=$(grep -E '(/trunk/$|/branches/$|/tags/$)' /tmp/submodules.txt|\
+  SUBMODULES=$(grep -E '(/trunk/$|/branches/$|/tags/$)' /tmp/submodules.txt|\
   sed -e 's/trunk\/$//' -e 's/tags\/$//' -e 's/branches\/$//'|sort|uniq)
+  export SUBMODULES
 
   # Print a report of the discovered submodules
   if [[ ${#SUBMODULES} -le 4 ]]
   then
     echo "There were no nested repositories discovered"
   else
-    options=($(echo ${SUBMODULES}))
+    options=()
+    while IFS='' read -r line; do options+=("$line"); done < <(echo "${SUBMODULES}")
     #Actions to take based on selection
     function ACTIONS {
-      for NUM in ${!options[@]}; do
+      for NUM in "${!options[@]}"; do
         [[ ${choices[NUM]} ]] && SUBDIRS+="${options[NUM]} "
       done
-      if [[ ! -z ${SUBDIRS} ]]
+      if [[ -n "${SUBDIRS}" ]]
       then
-        export IGNORE_DIRS=$(echo "'^("${SUBDIRS}")$'"|sed -e 's/ /|/g;s/\/|)/\/)/')
-        export FLAGS+=" --ignore-paths ${IGNORE_DIRS}"
+        IGNORE_DIRS=$(echo "'^(\"${SUBDIRS}\")$'"|sed -e 's/ /|/g;s/\/|)/\/)/')
+        export IGNORE_DIRS
+        FLAGS+=" --ignore-paths ${IGNORE_DIRS}"
+        export FLAGS
       fi
     }
     #Variables
@@ -263,13 +272,13 @@ function _discover_submodules()
         "ones are to be treated as git submodules"
         echo ""
         echo "Discovered Folders"
-        for NUM in ${!options[@]}; do
+        for NUM in "${!options[@]}"; do
           echo "[""${choices[NUM]:- }""]" $(( NUM+1 ))") ${options[NUM]}"
         done
         echo "$ERROR"
     }
     #Menu loop
-    while MENU && read -e -p "Select the desired options using their number (again to uncheck, ENTER when done): " -n1 SELECTION && [[ -n "${SELECTION}" ]]; do
+    while MENU && read -r -e -p "Select the desired options using their number (again to uncheck, ENTER when done): " -n1 SELECTION && [[ -n "${SELECTION}" ]]; do
       clear
       if [[ "${SELECTION}" == *[[:digit:]]* && ${SELECTION} -ge 1 && ${SELECTION} -le ${#options[@]} ]]; then
         (( SELECTION-- ))
@@ -292,7 +301,7 @@ function _create_gitignore()
 
   # Create .gitignore
   git svn show-ignore\
-    |grep [a-zA-Z0-9]\
+    |grep "[a-zA-Z0-9]"\
     |grep -v '^#'\
     |sed 's/^\///g' >> .gitignore
 }
@@ -301,15 +310,14 @@ function _create_gitignore()
 function _get_svn_layout()
 {
   unset FLAGS
-  FLAGS+="--no-minimize-url"
   echo "Analyzing repository layout..."
-  TAGS=$(svn ls ${REPO_URL} ${SVN_OPTIONS}|grep '^tags/$'|awk -F'/' {'print $(NF-1)'})
-  BRANCHES=$(svn ls ${REPO_URL} ${SVN_OPTIONS}|grep '^branches/$'|awk -F'/' {'print $(NF-1)'})
-  TRUNK=$(svn ls ${REPO_URL} ${SVN_OPTIONS}|grep '^trunk/$'|awk -F'/' {'print $(NF-1)'})
-  ROOT_FILES=$(svn ls ${REPO_URL} ${SVN_OPTIONS}|grep -Ev '(^tags/$|^trunk/$|^branches/$)')
-  [[ ! -z ${BRANCHES} ]] && [[ ! -z $(svn ls ${REPO_URL}/branches ${SVN_OPTIONS}) ]] && FLAGS+=" --branches=branches"
-  [[ ! -z ${TAGS} ]] && [[ ! -z $(svn ls ${REPO_URL}/tags ${SVN_OPTIONS}) ]] && FLAGS+=" --tags=tags"
-  if [[ ! -z ${TRUNK} ]] && [[ ! -z ${ROOT_FILES} ]]
+  TAGS=$(svn ls "${REPO_URL}" "${SVN_OPTIONS}"|grep '^tags/$'|awk -F'/' {'print $(NF-1)'})
+  BRANCHES=$(svn ls "${REPO_URL}" "${SVN_OPTIONS}"|grep '^branches/$'|awk -F'/' {'print $(NF-1)'})
+  TRUNK=$(svn ls "${REPO_URL}" "${SVN_OPTIONS}"|grep '^trunk/$'|awk -F'/' {'print $(NF-1)'})
+  ROOT_FILES=$(svn ls "${REPO_URL}" "${SVN_OPTIONS}"|grep -Ev '(^tags/$|^trunk/$|^branches/$)')
+  [[ -n "${BRANCHES}" ]] && [[ -n $(svn ls "${REPO_URL}/branches" "${SVN_OPTIONS}") ]] && FLAGS+=" --branches=branches"
+  [[ -n "${TAGS}" ]] && [[ -n $(svn ls "${REPO_URL}/tags" "${SVN_OPTIONS}") ]] && FLAGS+=" --tags=tags"
+  if [[ -n "${TRUNK}" ]] && [[ -n "${ROOT_FILES}" ]]
   then
     clear
     echo "Repository: ${REPO_URL}" && echo ""
@@ -326,9 +334,9 @@ function _get_svn_layout()
     read -n 1 -s -r -p "Press any key to continue, CTRL+C to exit..."
     echo ""
     FLAGS+=" --trunk=/"
-  elif [[ ! -z ${TRUNK} ]] && [[ ! -z $(svn ls ${REPO_URL}/trunk ${SVN_OPTIONS}) ]]
+  elif [[ -n "${TRUNK}" ]] && [[ -n $(svn ls "${REPO_URL}/trunk" "${SVN_OPTIONS}") ]]
   then
-    [[ -z ${ROOT_FILES} ]] && FLAGS+=" --trunk=trunk"
+    [[ -z "${ROOT_FILES}" ]] && FLAGS+=" --trunk=trunk"
   fi
 }
 
@@ -339,18 +347,19 @@ function _process_submodules()
   for SUBMODULE in ${SUBMODULES}
   do
     (
-      REPO_URL=${REPOSITORY}/${SUBMODULE}
-      REPO_NAME=$(echo ${SUBMODULE}|awk -F'/' {'print $(NF-1)'})
-      GITHUB_REMOTE=${GITHUB_URL}/${GITHUB_ORG}/${REPO_NAME}.git
-      REV_LIST=$(svn log ${REPO_URL} ${SVN_OPTIONS}|grep ^r[0-9]|awk {'print $1'}|sed 's/r//'|sort)
+      REPO_URL="${REPOSITORY}/${SUBMODULE}"
+      REPO_NAME=$(echo "${SUBMODULE}"|awk -F'/' {'print $(NF-1)'})
+      GITHUB_REMOTE="${GITHUB_URL}/${GITHUB_ORG}/${REPO_NAME}.git"
+      REV_LIST=$(svn log "${REPO_URL}" "${SVN_OPTIONS}"|grep "^r[0-9]"|awk {'print $1'}|sed 's/r//'|sort)
       echo "${SUBMODULE},${GITHUB_REMOTE}" >> /tmp/github_remotes.txt
       _get_svn_layout
       _prepare_github
       _git_svn_clone
-      cd ${REPO_NAME}
+      cd "${REPO_NAME}" || exit
       _migrate_trunk
       _migrate_branches
       _migrate_tags
+      # shellcheck disable=SC2103
       cd ..
     )
   done
@@ -360,25 +369,24 @@ function _process_submodules()
 function _clean_cutover()
 {
   _print_banner "Migrating ${REPO_NAME} without history"
-  rm -fr ${REPO_NAME}
-  git svn clone -rHEAD ${REPO_URL} ${REPO_NAME} ${FLAGS} --prefix=svn/
-  cd ${REPO_NAME}
+  rm -fr "${REPO_NAME}"
+  git svn clone -rHEAD "${REPO_URL}" "${REPO_NAME}" "${FLAGS}" --prefix=svn/
+  cd "${REPO_NAME}" || exit
   _migrate_trunk
   _migrate_branches
   _migrate_tags
-  cd ..
 }
 
 ## Migrate our repository with history
 function _git_svn_clone()
 {
-  git svn init ${REPO_URL} ${REPO_NAME} ${FLAGS} --prefix=svn/
+  git svn init "${REPO_URL}" "${REPO_NAME}" "${FLAGS}" --prefix=svn/
   (
-    cd ${REPO_NAME}
+    cd "${REPO_NAME}" || exit
     #REV=0
-    REV_LIST=$(svn log ${REPO_URL} ${SVN_OPTIONS}|grep ^r[0-9]|awk {'print $1'}|sed 's/r//'|sort -g)
-    REV_COUNT=$(echo ${REV_LIST}|wc -w)
-    REV_HEAD=$(echo ${REV_LIST}|awk {'print $NF'})
+    REV_LIST=$(svn log "${REPO_URL}" "${SVN_OPTIONS}"|grep "^r[0-9]"|awk {'print $1'}|sed 's/r//'|sort -g)
+    REV_COUNT=$(echo "${REV_LIST}"|wc -w)
+    #REV_HEAD=$(echo "${REV_LIST}"|awk {'print $NF'})
     ## Setup the progress bar
     CURRENT_REV=0
     # Start Script
@@ -394,13 +402,13 @@ function _git_svn_clone()
     for REV in ${REV_LIST}
     do
       RETRY_COUNT=0
-      showBar ${CURRENT_REV} ${REV_COUNT}
+      showBar "${CURRENT_REV}" "${REV_COUNT}"
       echo -e "" && echo -e "     REV: ${REV}"
-      git svn fetch -qr${REV} ${AUTHORS} >> ${LOG_FILE} 2>&1 > /dev/null
+      git svn fetch -qr"${REV}" "${AUTHORS}" &>> "${LOG_FILE}" > /dev/null
       RESULT=$?
-      while [[ ${RESULT} -ne 0 ]]
+      while [[ "${RESULT}" -ne 0 ]]
       do
-        if [[ ${RETRY_COUNT} -ge 5 ]]
+        if [[ "${RETRY_COUNT}" -ge 5 ]]
         then
           echo "" && echo ""
           echo "It would appear that retrying is a pointless venture."
@@ -410,14 +418,14 @@ function _git_svn_clone()
         echo "" && echo ""
         echo "Revision ${REV} failed to clone, possibly due to corruption."
         echo ""
-        ERROR_MSG=$(grep [a-zA-Z0-9] ${LOG_FILE}|tail -n1)
+        ERROR_MSG=$(grep "[a-zA-Z0-9]" "${LOG_FILE}"|tail -n1)
         echo "Error: ${ERROR_MSG}"
         echo ""
-        read -p "Would you like to attempt revision ${REV} again? (yes/no) " RETRY
-        while [[ "${RETRY,,}" == "yes" ]] && [[ "${RETRY,,}" != "no" ]]
+        read -r -p "Would you like to attempt revision ${REV} again? (yes/no) " RETRY
+        while [[ "${RETRY,,}" != "yes" ]] && [[ "${RETRY,,}" != "no" ]]
         do
           echo 'Please type "yes" or "no"'
-          read -p "Would you like to attempt revision ${REV} again? (yes/no) " RETRY
+          read -r -p "Would you like to attempt revision ${REV} again? (yes/no) " RETRY
         done
         clear
         HIDECURSOR
@@ -431,17 +439,17 @@ function _git_svn_clone()
         OLD_REV=0
         while [[ ${OLD_REV} -lt ${CURRENT_REV} ]]
         do
-          showBar ${OLD_REV} ${REV_COUNT}
+          showBar "${OLD_REV}" "${REV_COUNT}"
           ((OLD_REV++))
         done
         if [[ "${RETRY,,}" == "no" ]]
         then
-          git svn reset ${OLD_REV} >> ${LOG_FILE} 2>&1 > /dev/null
+          git svn reset "${OLD_REV}" &>> "${LOG_FILE}" > /dev/null
           RESULT=$?
         else
-          showBar ${CURRENT_REV} ${REV_COUNT}
+          showBar "${CURRENT_REV}" "${REV_COUNT}"
           echo -e "" && echo -e "     REV: ${REV}"
-          git svn fetch -qr${REV} ${AUTHORS} >> ${LOG_FILE} 2>&1 > /dev/null
+          git svn fetch -qr"${REV}" "${AUTHORS}" &>> "${LOG_FILE}" > /dev/null
           RESULT=$?
         fi
         ((RETRY++))
@@ -451,7 +459,6 @@ function _git_svn_clone()
     PUT 10 12
     echo -e ""
     NORM
-    cd ..
   )
 }
 
@@ -466,9 +473,9 @@ function _initialize_lfs()
     git lfs install
     for FILE in ${LARGE_FILES}
     do
-      EXTENSION=$(echo ${FILE}|awk -F'.' {'print " *."$3'})
-      git lfs track ${EXTENSION}
-      git add ${EXTENSION}
+      EXTENSION=$(echo "${FILE}"|awk -F'.' {'print " *."$3'})
+      git lfs track "${EXTENSION}"
+      git add "${EXTENSION}"
       git lfs migrate --include="*.${EXTENSION}"
     done
     git add .gitattributes
@@ -483,20 +490,21 @@ function _initialize_lfs()
 function _add_git_submodules()
 {
   (
-   REPO_NAME=$(svn info ${REPOSITORY} ${SVN_OPTIONS}|grep '^Path'|awk {'print $2'}|sed 's/ /-/g')
-   [[ $(pwd|awk -F'/' {'print $NF'}) != ${REPO_NAME} ]] && cd ${REPO_NAME}
+   REPO_NAME=$(svn info "${REPOSITORY}" "${SVN_OPTIONS}"|grep '^Path'|awk {'print $2'}|sed 's/ /-/g')
+   [[ $(pwd|awk -F'/' {'print $NF'}) != "${REPO_NAME}" ]] && cd "${REPO_NAME}" || exit
+   # shellcheck disable=SC2013
    for SUBMODULE in $(cat /tmp/github_remotes.txt)
    do
-     GITHUB_REMOTE=$(echo ${SUBMODULE}|awk -F',' {'print $2'})
-     LOCAL_PATH=$(echo ${SUBMODULE}|awk -F',' {'print $1'})
-     rm -fr ${LOCAL_PATH} >> ${LOG_FILE} 2>&1
+     GITHUB_REMOTE=$(echo "${SUBMODULE}"|awk -F',' {'print $2'})
+     LOCAL_PATH=$(echo "${SUBMODULE}"|awk -F',' {'print $1'})
+     rm -fr "${LOCAL_PATH}" &>> "${LOG_FILE}"
      git add -u
-     git submodule add ${GITHUB_REMOTE} ${LOCAL_PATH} >> ${LOG_FILE} 2>&1
+     git submodule add "${GITHUB_REMOTE}" "${LOCAL_PATH}" &>> "${LOG_FILE}"
      #git submodule init
-     git add .gitmodules ${LOCAL_PATH} && git add -u
-     git commit -m"Added git submodule ${SUBMODULE}" >> ${LOG_FILE} 2>&1
+     git add .gitmodules "${LOCAL_PATH}" && git add -u
+     git commit -m"Added git submodule ${SUBMODULE}" &>> "${LOG_FILE}"
    done
-   git push >> ${LOG_FILE} 2>&1
+   git push &>> "${LOG_FILE}"
   )
 }
 
@@ -507,13 +515,14 @@ HIDECURSOR(){ echo -en "\033[?25l";}
 NORM(){ echo -en "\033[?12l\033[?25h";}
 function showBar()
 {
-  percDone=$(echo 'scale=2;'$1/$2*100 | bc)
-  halfDone=$(echo $percDone/2 | bc) #I prefer a half sized bar graph
-  barLen=$(echo ${percDone%'.00'})
-  halfDone=$(expr $halfDone + 6)
+  percDone=$(echo 'scale=2;'"$1/$2*100" | bc)
+  halfDone=$(echo "$percDone/2" | bc) #I prefer a half sized bar graph
+  # shellcheck disable=SC2116
+  barLen=$(echo "${percDone%'.00'}")
+  halfDone=$(("$halfDone" + 6))
   tput bold
-  PUT 7 28; printf "%4.4s  " $barLen%     #Print the percentage
-  PUT 5 $halfDone;  echo -e "\033[7m \033[0m" #Draw the bar
+  PUT 7 28; printf "%4.4s  " "$barLen"%     #Print the percentage
+  PUT 5 "$halfDone";  echo -e "\033[7m \033[0m" #Draw the bar
   tput sgr0
 }
 

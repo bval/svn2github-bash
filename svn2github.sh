@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 ## Include files in the current working directory
-[ -z "$DEBUG" ] || set -xT
-
 if [[ $(uname) != 'Linux' ]]
 then
+  # shellcheck disable=SC1091
   source _functions.sh
 else
   INC_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)"
-  [[ -f ${INC_DIR}/_functions.sh ]] && source ${INC_DIR}/_functions.sh
+  # shellcheck disable=SC1090
+  [[ -f "${INC_DIR}/_functions.sh" ]] && source "${INC_DIR}/_functions.sh"
 fi
 
 _welcome
@@ -30,7 +30,7 @@ else
 fi
 ## Migrate trunk, branches, tags, submodules
 (
-  cd ${REPO_NAME}
+  cd "${REPO_NAME}" || exit
   git config http.sslVerify false
   _prepare_github
   _migrate_trunk
