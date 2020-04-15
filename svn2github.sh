@@ -13,6 +13,7 @@ fi
 _welcome
 _setup
 _svn_sizer
+_tag_sizer
 ## Process submodules
 if [[ ${ENABLE_SUBMODULES} ]]
 then

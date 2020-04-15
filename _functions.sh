@@ -109,6 +109,23 @@ function _svn_sizer()
   fi
 }
 
+## Check if we have any tags too long
+function _tag_sizer()
+{
+  _print_banner "Checking length of tag names"
+  svn list "${SVN_OPTIONS}" -vR "${REPO_URL}"|grep tags|cut -d / -f 2|sort -u > "/tmp/${REPO_NAME}-tags.txt"
+  while read tag; do
+    local -i len=`echo $tag | wc -m | awk '{print $1}'`
+    if [ $len -gt 200 ]; then
+      _print_banner "Tag found to be greater than 200 characters:" \
+     "$tag" \
+     " " \
+     "Please rename tag before re-running this script."
+     exit 1
+    fi
+  done < "/tmp/${REPO_NAME}-tags.txt"
+}
+
 # Convert bytes to human readable
 function _humanize_bytes()
 {
