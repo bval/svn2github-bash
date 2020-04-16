@@ -44,6 +44,7 @@ function _setup()
       AUTHORS=" --authors-file=${AUTHORS_FILE}"
     fi
   fi
+  [ ! -z ${GIT_SVN_FLAGS} ] && export GIT_SVN_FLAGS
   github_machine=$(echo ${GITHUB_URL}|awk -F'/' {'print $3'})
   svn_machine=$(echo ${REPOSITORY}|awk -F'/' {'print $3'}|awk -F':' {'print $1'})
   cat > ~/.netrc <<EOF
@@ -330,6 +331,7 @@ function _get_svn_layout()
   then
     [[ -z ${ROOT_FILES} ]] && FLAGS+=" --trunk=trunk"
   fi
+  [ ! -z ${GIT_SVN_FLAGS} ] && FLAGS+=" ${GIT_SVN_FLAGS}"
 }
 
 ## Convert our nested repositories to Git and push to GitHub
